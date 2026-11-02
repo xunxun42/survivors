@@ -20,6 +20,10 @@ js = js.replace('if (DEMO) demo();', `if (DEMO) {
     cast: () => { SK.cd = 0; castChain(); },
     laser: () => { SK.charge = 1; SK.cd = 0; SK.ang = aimAngle(); fireLaser(); },
     resetCharge: () => { SK.charge = 0; SK.cd = 0; SK.firing = 0; },
+    setBranch: (b) => { SK.lv = 2; SK.branch = b; SK.fieldT = 0; SK.fieldCd = 0; },
+    discharge: () => dischargeField(),
+    field: () => ({ branch: SK.branch, t: +SK.fieldT.toFixed(2), cd: +SK.fieldCd.toFixed(2), interval: +fieldInterval().toFixed(2) }),
+    offerNames: () => offer.map(o => o.name),
     step: (n) => { for (let k = 0; k < n; k++) update(STEP); },
     sk: () => ({ lv: SK.lv, cd: +SK.cd.toFixed(2), charge: +SK.charge.toFixed(2), firing: +SK.firing.toFixed(2), chain: SK.chain }),
     snap: () => enemies.map(e => ({ hp: +e.hp.toFixed(1), maxHp: e.maxHp, para: +e.para.toFixed(2), dx: Math.round(e.x - P.x) })),
@@ -122,6 +126,55 @@ const hit3 = s.filter(e => e.hp < 999).length;
 log('  命中数 ' + hit3 + ' | 剩余 ' + s.map(e => e.hp).join(', ') + ' | SK ' + JSON.stringify(T.sk()));
 check(hit3 === 5, '激光贯穿命中一列 5 个目标');
 check(T.sk().firing > 0, '进入发射动画');
+
+log('=== 二级分支：电磁领域 ===');
+T.clear();
+const inR = T.add(100, 0, 9999);       // 领域内
+const outR = T.add(220, 0, 9999);      // 领域外，但离 inR 只有 120（可传导）
+T.setBranch('field');
+T.discharge();
+s = T.snap();
+log('  领域内敌人剩余 ' + s[0].hp + ' | 领域外(传导)剩余 ' + s[1].hp + ' | 状态 ' + JSON.stringify(T.field()));
+check(s[0].hp < 9999, '领域内敌人被电击');
+check(s[1].hp < 9999, '电弧传导到领域外的敌人');
+
+log('=== 频率随连续电击提升 ===');
+T.clear();
+T.add(100, 0, 999999);
+T.setBranch('field');
+const i0 = T.field().interval;
+/* 每 10 帧补一个靶子（放在领域内），保证连续电击不中断 */
+function stepWithTarget(frames) {
+  for (let k = 0; k < frames; k++) {
+    if (k % 10 === 0) { T.clear(); T.add(100, 0, 999999); }
+    T.step(1);
+  }
+}
+stepWithTarget(120);
+const i2 = T.field().interval;
+stepWithTarget(720);                    // 累计 12s
+const i12 = T.field().interval;
+log('  起始 ' + i0 + 's/次 → 2s 后 ' + i2 + 's/次 → 12s 后 ' + i12 + 's/次');
+check(i12 < i2 && i2 < i0, '连续电击越久，间隔越短');
+check(Math.abs(i12 - 0.34) < 0.03, '满档间隔 0.34s');
+
+log('=== 无目标时频率回落 ===');
+T.clear();
+const beforeT = T.field().t;
+T.step(240);                            // 4s 没敌人
+const afterT = T.field().t;
+log('  清空 4s：连续计时 ' + beforeT + ' → ' + afterT);
+check(afterT < beforeT, '无敌人时连续电击计时回落');
+
+log('=== Lv1→Lv2 出现二选一分支 ===');
+T.clear();
+T.setLv(1);
+T.forceXp();
+T.step(1);
+const names = T.offerNames();
+log('  选项 ' + JSON.stringify(names));
+check(names.some(n => n.indexOf('麻痹') >= 0) && names.some(n => n.indexOf('电磁领域') >= 0), '同时提供麻痹与电磁领域两条分支');
+T.choose(0);
 
 log('=== 蓄力 ===');
 function framesToFire(hold) {
