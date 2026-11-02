@@ -31,9 +31,12 @@
 
 | 等级 | 效果 |
 |---|---|
-| **Lv1 初级雷电传导** | 每 1.5 秒自动向 430px 内最近的敌人放电，电弧再连锁到附近最多 3 个目标（每跳伤害递减 15%） |
-| **Lv2 麻痹** | 命中的敌人**麻痹 1 秒**（停止移动，身上有脉冲光环 + 爬电），并**额外扣除目标 15% 最大生命** |
-| **Lv3 激光** | 攻击方式改为**蓄力激光**：自然蓄满 1.05 秒，按住攻击键 0.43 秒蓄满；蓄得越满，射线越长、伤害越高 |
+| **Lv1 初级雷电传导** | 每 1.5 秒自动向 430px 内最近的敌人放电，电弧再连锁到附近最多 3 个目标（每跳伤害递减 15%，基础 22 伤害） |
+| **Lv2 二选一 · 麻痹** | 命中的敌人**麻痹 1 秒**（停止移动，脉冲光环 + 爬电），并**额外扣除目标 15% 最大生命** |
+| **Lv2 二选一 · 电磁领域** | 身周 **155px** 持续电弧电击（范围比放电更小），可传导到领域外最多 2 个敌人；**连续电击越久频率越高**：1.6 秒/次 → 0.34 秒/次（12 秒爬满），每次 16 伤害 + 0.25 秒麻痹；领域内没有敌人时计时回落 |
+| **Lv3 激光** | 攻击方式改为**蓄力激光**：自然蓄满 1.05 秒，按住攻击键 0.43 秒蓄满；蓄得越满，射线越长、伤害越高（两条分支都能升） |
+
+升到 2 级时两张卡**同时出现**，选哪张就锁定哪条分支；领域分支升到 3 级后，领域会继续自动放电，同时攻击变成蓄力激光。
 
 Lv3 数值：射程 `300 + 420 × 蓄力`（满蓄 720px），伤害 `26 + 34 × 蓄力`（满蓄 60）**再加上目标 15% 最大生命**，沿直线**贯穿**所有敌人，命中后麻痹 1.2 秒。
 
@@ -62,7 +65,11 @@ shots/         截图（桌面 + 技能三级 + 手机横竖屏）
 
 <p align="center">
   <img src="shots/skill-1-chain.png" width="420" alt="Lv1 连锁放电" />
-  <img src="shots/skill-2-paralysis.png" width="420" alt="Lv2 麻痹" />
+  <img src="shots/skill-2-paralysis.png" width="420" alt="Lv2 麻痹分支" />
+</p>
+<p align="center">
+  <img src="shots/skill-2-branch.png" width="420" alt="Lv2 二选一" />
+  <img src="shots/skill-2-field.png" width="420" alt="Lv2 电磁领域分支" />
 </p>
 <p align="center">
   <img src="shots/skill-3-laser.png" width="420" alt="Lv3 激光" />
@@ -71,7 +78,7 @@ shots/         截图（桌面 + 技能三级 + 手机横竖屏）
 
 <p align="center">
   <img src="shots/mobile-portrait.png" width="290" alt="手机竖屏" />
-  <img src="shots/mobile-landscape.png" width="430" alt="手机横屏" />
+  <img src="shots/mobile-landscape.png" width="430" alt="手机横屏" />`n  <img src="shots/mobile-field.png" width="290" alt="手机电磁领域" />
 </p>
 
 ## 调试参数
@@ -92,18 +99,24 @@ shots/         截图（桌面 + 技能三级 + 手机横竖屏）
 | 敌人强度 | `function spawnEnemy()`（`20` / `58` 血量，`7` / `14` 伤害，`hpScale = 1 + time / 95`） |
 | 雷电：范围 / 连锁 / 间隔 | `SKILL_RANGE = 430`、`castChain()` 里的 `1.5`(间隔)、`200 * 200`(连锁半径)、`22`(基础伤害)、`.15`(每跳衰减) |
 | 雷电：麻痹时长 / 15% 扣血 | `castChain()` 里的 `e.para = 1.0`、`dmg += e.maxHp * .15` |
+| 电磁领域：范围 / 传导 | `FIELD_R = 155`（领域半径）、`FIELD_CONDUCT = 150`（传导距离）、传导上限 `jumps >= 2` |
+| 电磁领域：升频曲线 | `FIELD_CD_MAX = 1.6` / `FIELD_CD_MIN = .34`（起止间隔）、`FIELD_T_MAX = 12`（爬满秒数）、`fieldTick()` 里的回落速率 `* 1.5` |
+| 电磁领域：单次伤害 / 麻痹 | `dischargeField()` 里的 `16 * ST.dmg`、`e.para = Math.max(e.para, .25)`、击退强度 `38` |
 | 激光：蓄力 / 射程 / 伤害 | `skillTick()` 里的 `/ 1.05`(蓄满秒数)、`2.4`(按住倍速)；`fireLaser()` 里的 `300 + 420 * SK.charge`、`26 + 34 * SK.charge`、`e.r + 12`(判定宽度) |
-| 升级选项 | `const POOL = [...]` 与 `const LIGHTNING = [...]` |
+| 升级选项 | `const POOL = [...]`、`const LIGHTNING = [...]`、`const FIELD_CARD` |
 | 升级曲线 | `need = Math.round(6 + level * 5.0)` |
 | 手机控件大小 | `drawTouchUI()` 里的 `compact` / `jb` / `ar` / `pad` |
 
 ## 自测（`node selftest.js`）
 
 ```
-PASS 连锁命中 3 个目标          PASS 伤害 = 基础 22 + 目标最大生命 15%
-PASS 产生 3 段电弧              PASS 命中后进入麻痹 / 1 秒后解除
-PASS 激光贯穿命中一列 5 个目标   PASS 自然蓄力约 1.05s
-PASS 按住攻击键明显加快蓄力(0.43s)   PASS 满负载单步 0.28ms
+PASS 连锁命中 3 个目标              PASS 伤害 = 基础 22 + 目标最大生命 15%
+PASS 产生 3 段电弧                  PASS 命中后进入麻痹 / 1 秒后解除
+PASS 激光贯穿命中一列 5 个目标       PASS 自然蓄力约 1.05s
+PASS 按住攻击键明显加快蓄力(0.43s)   PASS 领域内敌人被电击
+PASS 电弧传导到领域外的敌人          PASS 连续电击越久间隔越短(1.6→1.39→0.34s)
+PASS 无敌人时连续电击计时回落        PASS Lv2 同时提供麻痹与电磁领域两条分支
+PASS 满负载单步 0.25ms
 ```
 
 其他实测：从 0 秒站着不动、只按攻击约 **61 秒**被打死（走位会更久）；同屏 130 敌人时单帧逻辑约 **0.28–0.42ms**（60fps 预算 16.6ms）；布局用无头 Chrome 在 390×844 / 844×390 / 1280×720 三种尺寸截图核对过。
